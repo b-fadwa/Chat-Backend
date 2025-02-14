@@ -40,7 +40,7 @@ Function onOpen($ws : 4D:C1709.WebSocketConnection; $info : Object)
 		$data:=This:C1470.formatData($message)
 		$ws.send(JSON Stringify:C1217({sender: String:C10($message.Sender); receiver: String:C10($message.Receiver); \
 			content: $message.Content; image: $data.imageBase64; audio: $data.audioBase64; file: $data.fileBase64; sentAt: Time:C179($message.sentAt); \
-			sentThe: $message.sentThe; dateStamp: String:C10($message.sentThe; ISO date GMT:K1:10; Time:C179($message.sentAt))})+"\n")
+			sentThe: $message.sentThe;poll: $message.Poll; dateStamp: String:C10($message.sentThe; ISO date GMT:K1:10; Time:C179($message.sentAt))})+"\n")
 		//End for each 
 		//End if 
 	End for each 
@@ -79,15 +79,31 @@ Function onMessage($ws : Object; $info : Object)
 			: ($data.audio#"" && Not:C34(Undefined:C82($data.audio)))
 				TEXT TO BLOB:C554($data.audio; vxBlob; UTF8 C string:K22:15)
 				$message.Audio:=vxBlob
+			: (Not:C34(Undefined:C82($data.poll)))
+				If ($data.poll.selectedOptions.length#0)
+					$message:=This:C1470.onUpdatePoll($data.poll.pollID; $data.poll.selectedOptions)
+					return 
+				Else 
+					$message.Poll:=$data.poll
+				End if 
 		End case 
 		$message.save()
 		$formattedData:=This:C1470.formatData($message)
 		$client.send(JSON Stringify:C1217({sender: String:C10($message.Sender); receiver: String:C10($message.Receiver); content: $message.Content; \
 			file: $formattedData.fileBase64; audio: $formattedData.audioBase64; image: $formattedData.imageBase64; sentAt: Time:C179($message.sentAt); \
-			sentThe: $message.sentThe; dateStamp: String:C10($message.sentThe; ISO date GMT:K1:10; Time:C179($message.sentAt))})+"\n")
+			sentThe: $message.sentThe;  poll: $message.Poll;dateStamp: String:C10($message.sentThe; ISO date GMT:K1:10; Time:C179($message.sentAt))})+"\n")
 		//End if 
 	End for each 
 	
+	Function onUpdatePoll($pollID : Variant; $selectedOptions : Object) : cs:C1710.MessagesEntity
+	var $message : cs:C1710.MessagesEntity
+	$message:=ds:C1482.Messages.query("Poll.pollID = :1"; $pollId).first()
+	If ($message#Null:C1517)
+		$message.Poll.selectedOptions.push({sender: String:C10(This:C1470.address); selectedOptions: $selectedOptions})
+		$message.save()
+		return $message
+	End if 
+
 	// Called when an error occured
 Function onError($ws : Object; $info : Object)
 	$ws.wss.handler.logFile("*** Error: "+This:C1470.name+" - "+This:C1470.address+" - "+JSON Stringify:C1217($info))
